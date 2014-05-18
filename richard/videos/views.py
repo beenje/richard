@@ -319,7 +319,29 @@ class VideoListCreateAPI(generics.ListCreateAPIView):
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = ('added', 'recorded', 'title')
 
+    def paginate_queryset(self, queryset, page_size=None):
+        """Return a page object with a list of Video instances
+
+        Override the default method to replace the list of SearchResult
+        instances with a list of Video instances when the queryset is a
+        SearchQuerySet.
+        """
+        page = super(VideoListCreateAPI, self).paginate_queryset(
+                queryset, page_size=page_size)
+        if isinstance(queryset, SearchQuerySet):
+            page.object_list = [sr.object for sr in page.object_list]
+        return page
+
     def get_queryset(self):
+        category = self.request.QUERY_PARAMS.get('category', None)
+        q = self.request.QUERY_PARAMS.get('q', None)
+        if q is not None:
+            qs = SearchQuerySet().filter(content=q)
+            qs = qs.filter_or(speakers__startswith=q.lower())
+            if category is not None:
+                qs = qs.filter_and(category__exact=category)
+            return qs
+
         if self.request.user.is_staff:
             queryset = models.Video.objects.all()
         else:
@@ -341,7 +363,6 @@ class VideoListCreateAPI(generics.ListCreateAPIView):
                     .filter(tag__icontains=tag)
                     .values_list('pk', flat=True)))
 
-        category = self.request.QUERY_PARAMS.get('category', None)
         if category is not None:
             queryset = queryset.filter(
                 category__slug=category)

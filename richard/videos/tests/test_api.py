@@ -16,9 +16,13 @@
 
 import datetime
 import json
+import os
+import shutil
 from functools import partial
 from imp import reload
 
+from django.conf import settings
+from django.core import management
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils.encoding import smart_text
@@ -251,6 +255,49 @@ class TestAPI(TestAPIBase):
                              content_type='application/json')
         data = json.loads(smart_text(resp.content))
         eq_([v['title'] for v in data['results']], [u'FooB', u'FooA', u'FooC'])
+
+
+class TestVideoSearchAPI(TestAPIBase):
+    def tearDown(self):
+        """Remove the search index after each test run.
+
+        The path is set in richard/settings_test.py."""
+        pass
+        path = settings.HAYSTACK_CONNECTIONS['default']['PATH']
+        if os.path.exists(path):
+            shutil.rmtree(path)
+
+    def test_videos_search(self):
+        """Test the search view."""
+        video(title=u'Flask by Example', save=True)
+        video(title=u'Django by Example', save=True)
+        video(title=u'Diving into Flask', save=True)
+        management.call_command('rebuild_index', interactive=False)
+
+        resp = self.auth_get('/api/v2/video/?q=flask',
+                             content_type='application/json')
+
+        data = json.loads(smart_text(resp.content))
+        eq_(set([v['title'] for v in data['results']]),
+            set([u'Flask by Example', u'Diving into Flask']))
+
+    def test_videos_search_by_category(self):
+        """Test the search view."""
+        cat1 = category(title=u'PyCon US 2014', save=True)
+        cat2 = category(title=u'PyCon US 2013', save=True)
+        video(title=u'Flask by Example',
+              category=cat1, save=True)
+        video(title=u'Django by Example',
+              category=cat1, save=True)
+        video(title=u'Diving into Flask',
+              category=cat2, save=True)
+        management.call_command('rebuild_index', interactive=False)
+
+        resp = self.auth_get('/api/v2/video/?q=flask&category=pycon+us+2014',
+                             content_type='application/json')
+
+        data = json.loads(smart_text(resp.content))
+        eq_([v['title'] for v in data['results']], [u'Flask by Example'])
 
 
 class TestVideoPostAPI(TestAPIBase):

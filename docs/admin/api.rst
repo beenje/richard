@@ -154,6 +154,14 @@ Videos
 
       $ curl -X GET 'http://example.com/api/v2/video/?ordering=-added'
 
+``GET /api/v2/video/?q=FOO``
+    Returns videos matching the FOO search keyword. The search can be
+    restricted to a specific category.
+
+    Example::
+
+      $ curl -X GET 'http://example.com/api/v2/video/?q=flask'
+
 ``POST /api/v2/video/``
     Creates a new video.
 
